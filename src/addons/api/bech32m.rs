@@ -1,4 +1,5 @@
 use crate::addons::MockApiBech32;
+use crate::api::MultiTestApi;
 use bech32::Variant;
 use cosmwasm_std::{Addr, Api, CanonicalAddr, RecoverPubkeyError, StdResult, VerificationError};
 
@@ -16,6 +17,7 @@ impl MockApiBech32m {
     ///
     /// ```
     /// use multitest::addons::MockApiBech32m;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32m::new("osmosis");
     /// let addr = api.addr_make("sender");
@@ -37,6 +39,7 @@ impl Api for MockApiBech32m {
     /// ```
     /// use cosmwasm_std::Api;
     /// use multitest::addons::MockApiBech32m;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32m::new("osmosis");
     /// let addr = api.addr_make("sender");
@@ -55,6 +58,7 @@ impl Api for MockApiBech32m {
     /// ```
     /// use cosmwasm_std::Api;
     /// use multitest::addons::MockApiBech32;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32::new("osmosis");
     /// let addr = api.addr_make("sender");
@@ -76,6 +80,7 @@ impl Api for MockApiBech32m {
     /// ```
     /// use cosmwasm_std::Api;
     /// use multitest::addons::MockApiBech32m;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32m::new("osmosis");
     /// let addr = api.addr_make("sender");
@@ -130,13 +135,14 @@ impl Api for MockApiBech32m {
     }
 }
 
-impl MockApiBech32m {
+impl MultiTestApi for MockApiBech32m {
     /// Returns an address in **Bech32m** format, built from provided input string.
     ///
     /// # Example
     ///
     /// ```
     /// use multitest::addons::MockApiBech32m;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32m::new("osmosis");
     /// let addr = api.addr_make("sender");
@@ -148,7 +154,7 @@ impl MockApiBech32m {
     ///
     /// This function panics when generating a valid address in **Bech32**
     /// format is not possible, especially when prefix is too long or empty.
-    pub fn addr_make(&self, input: &str) -> Addr {
+    fn addr_make(&self, input: &str) -> Addr {
         self.0.addr_make(input)
     }
 }

@@ -1,9 +1,8 @@
-use cosmwasm_std::testing::MockApi;
-use cosmwasm_std::Api;
+use crate::api::{MultiTestApi, MultiTestMockApi};
 
 pub struct Chain {
-    /// [Api] used in the chain.
-    api: Box<dyn Api>,
+    /// API used in the chain.
+    api: Box<dyn MultiTestApi>,
 }
 
 impl Default for Chain {
@@ -17,17 +16,17 @@ impl Chain {
     /// Creates a new instance of a [Chain].
     pub fn new() -> Self {
         Self {
-            api: Box::<MockApi>::default(),
+            api: Box::<MultiTestMockApi>::default(),
         }
     }
 
-    pub fn with_api(mut self, api: impl Api + 'static) -> Self {
+    pub fn with_api(mut self, api: impl MultiTestApi + 'static) -> Self {
         self.api = Box::new(api);
         self
     }
 
-    /// Returns a reference to [Api] configured for a [Chain].
-    pub fn api(&self) -> &dyn Api {
+    /// Returns a reference to API configured in [Chain].
+    pub fn api(&self) -> &dyn MultiTestApi {
         self.api.as_ref()
     }
 }

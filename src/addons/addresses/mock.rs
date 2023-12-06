@@ -86,6 +86,7 @@ impl AddressGenerator for MockAddressGenerator {
     ///
     /// ```
     /// # use cosmwasm_std::Api;
+    /// # use multitest::MultiTestApi;
     /// # use cosmwasm_std::testing::MockStorage;
     /// # use multitest::AddressGenerator;
     /// # use multitest::addons::{MockAddressGenerator, MockApiBech32};

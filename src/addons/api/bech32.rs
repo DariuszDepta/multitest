@@ -1,3 +1,4 @@
+use crate::api::MultiTestApi;
 use bech32::{decode, encode, FromBase32, ToBase32, Variant};
 use cosmwasm_std::testing::MockApi;
 use cosmwasm_std::{
@@ -23,6 +24,7 @@ impl MockApiBech32 {
     ///
     /// ```
     /// use multitest::addons::MockApiBech32;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32::new("juno");
     /// let addr = api.addr_make("creator");
@@ -54,6 +56,7 @@ impl Api for MockApiBech32 {
     /// ```
     /// use cosmwasm_std::Api;
     /// use multitest::addons::MockApiBech32;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32::new("juno");
     /// let addr = api.addr_make("creator");
@@ -72,6 +75,7 @@ impl Api for MockApiBech32 {
     /// ```
     /// use cosmwasm_std::Api;
     /// use multitest::addons::MockApiBech32;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32::new("juno");
     /// let addr = api.addr_make("creator");
@@ -100,6 +104,7 @@ impl Api for MockApiBech32 {
     /// ```
     /// use cosmwasm_std::Api;
     /// use multitest::addons::MockApiBech32;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32::new("juno");
     /// let addr = api.addr_make("creator");
@@ -159,13 +164,14 @@ impl Api for MockApiBech32 {
     }
 }
 
-impl MockApiBech32 {
+impl MultiTestApi for MockApiBech32 {
     /// Returns an address in **Bech32** format, built from provided input string.
     ///
     /// # Example
     ///
     /// ```
     /// use multitest::addons::MockApiBech32;
+    /// use multitest::MultiTestApi;
     ///
     /// let api = MockApiBech32::new("juno");
     /// let addr = api.addr_make("creator");
@@ -177,7 +183,7 @@ impl MockApiBech32 {
     ///
     /// This function panics when generating a valid address in **Bech32**
     /// format is not possible, especially when prefix is too long or empty.
-    pub fn addr_make(&self, input: &str) -> Addr {
+    fn addr_make(&self, input: &str) -> Addr {
         let digest = Sha256::digest(input).to_vec();
         match encode(self.prefix, digest.to_base32(), self.variant) {
             Ok(address) => Addr::unchecked(address),
