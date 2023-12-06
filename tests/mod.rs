@@ -1,1 +1,2 @@
+mod test_chain;
 mod test_errors;
