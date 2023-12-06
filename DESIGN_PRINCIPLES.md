@@ -1,0 +1,3 @@
+- Use `new()` constructor and avoid `Default` where possible.
+- Measure code coverage with `tarpaulin`.
+- Write tests for library (treated as black-box), avoid unit tests (when some code can not be covered, then should be removed).

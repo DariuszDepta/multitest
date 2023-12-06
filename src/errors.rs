@@ -61,7 +61,7 @@ impl Error {
     }
 
     pub fn unregistered_code_id(value: u64) -> Self {
-        Self::UnregisteredCodeId(value.into())
+        Self::UnregisteredCodeId(value)
     }
 
     pub fn duplicated_contract_address(value: impl Into<String>) -> Self {
