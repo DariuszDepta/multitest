@@ -1,20 +1,15 @@
 use cosmwasm_std::{
     to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Response,
-    StdError,
+    StdResult,
 };
 use cw_storage_plus::Item;
 use multitest::{Contract, ContractWrapper};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PayoutInit {
     pub payout: Coin,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SudoMsg {
-    pub set_count: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,8 +18,13 @@ pub enum PayoutQuery {
     Payout {},
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct CountResponse {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PayoutSudo {
+    pub set_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PayoutCountResponse {
     pub count: u32,
 }
 
@@ -34,18 +34,13 @@ const COUNT: Item<u32> = Item::new("count");
 /// Payout amount.
 const PAYOUT: Item<PayoutInit> = Item::new("payout");
 
-fn instantiate(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: PayoutInit,
-) -> Result<Response, StdError> {
+fn instantiate(deps: DepsMut, _: Env, _: MessageInfo, msg: PayoutInit) -> StdResult<Response> {
     PAYOUT.save(deps.storage, &msg)?;
     COUNT.save(deps.storage, &0)?;
     Ok(Response::default())
 }
 
-fn execute(deps: DepsMut, _env: Env, info: MessageInfo, _msg: Empty) -> Result<Response, StdError> {
+fn execute(deps: DepsMut, _: Env, info: MessageInfo, _: Empty) -> StdResult<Response> {
     // always try to payout what was set originally
     let payout = PAYOUT.load(deps.storage)?;
     let msg = BankMsg::Send {
@@ -57,16 +52,11 @@ fn execute(deps: DepsMut, _env: Env, info: MessageInfo, _msg: Empty) -> Result<R
         .add_attribute("action", "payout"))
 }
 
-fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, StdError> {
-    COUNT.save(deps.storage, &msg.set_count)?;
-    Ok(Response::default())
-}
-
-fn query(deps: Deps, _env: Env, msg: PayoutQuery) -> Result<Binary, StdError> {
+fn query(deps: Deps, _: Env, msg: PayoutQuery) -> StdResult<Binary> {
     match msg {
         PayoutQuery::Count {} => {
             let count = COUNT.load(deps.storage)?;
-            let res = CountResponse { count };
+            let res = PayoutCountResponse { count };
             to_json_binary(&res)
         }
         PayoutQuery::Payout {} => {
@@ -74,6 +64,11 @@ fn query(deps: Deps, _env: Env, msg: PayoutQuery) -> Result<Binary, StdError> {
             to_json_binary(&payout)
         }
     }
+}
+
+fn sudo(deps: DepsMut, _: Env, msg: PayoutSudo) -> StdResult<Response> {
+    COUNT.save(deps.storage, &msg.set_count)?;
+    Ok(Response::default())
 }
 
 pub fn contract() -> Box<dyn Contract> {
