@@ -1,6 +1,5 @@
-use crate::{bail, AnyResult, AppResponse, CosmosRouter, MockCustomMsg};
-use cosmwasm_std::{Addr, Api, Binary, BlockInfo, CustomQuery, Querier, Storage};
-use serde::de::DeserializeOwned;
+use crate::{bail, AnyResult, AppResponse, CosmosRouter, MockCustomMsg, MockCustomQuery};
+use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -23,7 +22,7 @@ pub trait Module {
     ) -> AnyResult<AppResponse>
     where
         ExecC: MockCustomMsg + 'static,
-        QueryC: CustomQuery + DeserializeOwned + 'static;
+        QueryC: MockCustomQuery + 'static;
 
     /// Runs any [QueryT](Self::QueryT) message,
     /// which can be called by any external actor or smart contract.
@@ -51,7 +50,7 @@ pub trait Module {
     ) -> AnyResult<AppResponse>
     where
         ExecC: MockCustomMsg + 'static,
-        QueryC: CustomQuery + DeserializeOwned + 'static;
+        QueryC: MockCustomQuery + 'static;
 }
 
 pub struct FailingModule<ExecT, QueryT, SudoT>(PhantomData<(ExecT, QueryT, SudoT)>);

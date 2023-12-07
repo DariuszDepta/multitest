@@ -23,6 +23,10 @@ pub trait MockCustomMsg: CustomMsg + DeserializeOwned {}
 
 impl MockCustomMsg for Empty {}
 
+pub trait MockCustomQuery: CustomQuery + DeserializeOwned {}
+
+impl MockCustomQuery for Empty {}
+
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
     block.height += 1;
@@ -107,7 +111,7 @@ impl BasicApp {
 pub fn custom_app<ExecC, QueryC, F>(init_fn: F) -> BasicApp<ExecC, QueryC>
 where
     ExecC: MockCustomMsg + 'static,
-    QueryC: Debug + CustomQuery + DeserializeOwned + 'static,
+    QueryC: Debug + MockCustomQuery + 'static,
     F: FnOnce(
         &mut Router<
             BankKeeper,
@@ -130,7 +134,7 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, Starga
     for App<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
 where
     CustomT::ExecT: MockCustomMsg + 'static,
-    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    CustomT::QueryT: MockCustomQuery + 'static,
     WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
     ApiT: Api,
@@ -154,7 +158,7 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, Starga
     for App<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
 where
     CustomT::ExecT: MockCustomMsg + 'static,
-    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    CustomT::QueryT: MockCustomQuery + 'static,
     WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
     ApiT: Api,
@@ -248,7 +252,7 @@ where
     GovT: Gov,
     StargateT: Stargate,
     CustomT::ExecT: MockCustomMsg + 'static,
-    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    CustomT::QueryT: MockCustomQuery + 'static,
 {
     /// Registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
@@ -332,7 +336,7 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, Starga
     App<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
 where
     CustomT::ExecT: MockCustomMsg + 'static,
-    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    CustomT::QueryT: MockCustomQuery + 'static,
     WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
     ApiT: Api,

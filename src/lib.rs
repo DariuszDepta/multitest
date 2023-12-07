@@ -24,7 +24,7 @@ mod wasm;
 pub use addresses::{AddressGenerator, SimpleAddressGenerator};
 pub use anyhow::{anyhow, bail, Context as AnyContext, Error as AnyError, Result as AnyResult};
 pub use api::MultiTestApi;
-pub use app::{custom_app, next_block, no_init, App, BasicApp, MockCustomMsg};
+pub use app::{custom_app, next_block, no_init, App, BasicApp, MockCustomMsg, MockCustomQuery};
 pub use app_builder::{AppBuilder, BasicAppBuilder};
 pub use bank::{Bank, BankKeeper, BankSudo};
 pub use chain::Chain;
