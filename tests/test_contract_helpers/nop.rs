@@ -23,6 +23,6 @@ fn query(deps: Deps, env: Env, msg: Empty) -> Result<Binary, StdError> {
     to_json_binary(&msg)
 }
 
-pub fn contract() -> Box<dyn Contract<Empty>> {
+pub fn contract() -> Box<dyn Contract> {
     Box::new(ContractWrapper::new_with_empty(execute, instantiate, query))
 }

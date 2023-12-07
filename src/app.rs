@@ -13,10 +13,9 @@ use crate::{FailingModule, Module};
 use crate::{Stargate, StargateFailing};
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
-    to_json_binary, Addr, Api, BlockInfo, CosmosMsg, CustomQuery, Empty, Querier, QuerierResult,
-    QuerierWrapper, Record, Storage,
+    to_json_binary, Addr, Api, BlockInfo, CosmosMsg, CustomMsg, CustomQuery, Empty, Querier,
+    QuerierResult, QuerierWrapper, Record, Storage,
 };
-use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
@@ -103,7 +102,7 @@ impl BasicApp {
 /// Outside of `App` implementation to make type elision better.
 pub fn custom_app<ExecC, QueryC, F>(init_fn: F) -> BasicApp<ExecC, QueryC>
 where
-    ExecC: Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    ExecC: CustomMsg + DeserializeOwned + 'static,
     QueryC: Debug + CustomQuery + DeserializeOwned + 'static,
     F: FnOnce(
         &mut Router<
@@ -126,7 +125,7 @@ where
 impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT> Querier
     for App<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
 where
-    CustomT::ExecT: Clone + Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::ExecT: CustomMsg + DeserializeOwned + 'static,
     CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
@@ -150,7 +149,7 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, Starga
     Executor<CustomT::ExecT>
     for App<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
 where
-    CustomT::ExecT: Clone + Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::ExecT: CustomMsg + DeserializeOwned + 'static,
     CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
@@ -244,7 +243,7 @@ where
     IbcT: Ibc,
     GovT: Gov,
     StargateT: Stargate,
-    CustomT::ExecT: Clone + Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::ExecT: CustomMsg + DeserializeOwned + 'static,
     CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
 {
     /// Registers contract code (like uploading wasm bytecode on a chain),
@@ -328,7 +327,7 @@ where
 impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
     App<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
 where
-    CustomT::ExecT: Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
+    CustomT::ExecT: CustomMsg + DeserializeOwned + 'static,
     CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
