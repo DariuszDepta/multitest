@@ -69,7 +69,8 @@ where
     fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> AnyResult<AppResponse>;
 
     /// Create a contract and get the new address.
-    /// This is just a helper around execute()
+    /// This is just a helper around [execute][Self::execute] function
+    /// with `WasmMsg::Instantiate` message.
     fn instantiate_contract<M, L, A>(
         &mut self,
         code_id: u64,
