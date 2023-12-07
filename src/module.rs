@@ -1,7 +1,5 @@
-use crate::AppResponse;
-use crate::CosmosRouter;
-use crate::{bail, AnyResult};
-use cosmwasm_std::{Addr, Api, Binary, BlockInfo, CustomMsg, CustomQuery, Querier, Storage};
+use crate::{bail, AnyResult, AppResponse, CosmosRouter, MockCustomMsg};
+use cosmwasm_std::{Addr, Api, Binary, BlockInfo, CustomQuery, Querier, Storage};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -24,7 +22,7 @@ pub trait Module {
         msg: Self::ExecT,
     ) -> AnyResult<AppResponse>
     where
-        ExecC: CustomMsg + DeserializeOwned + 'static,
+        ExecC: MockCustomMsg + 'static,
         QueryC: CustomQuery + DeserializeOwned + 'static;
 
     /// Runs any [QueryT](Self::QueryT) message,
@@ -52,7 +50,7 @@ pub trait Module {
         msg: Self::SudoT,
     ) -> AnyResult<AppResponse>
     where
-        ExecC: CustomMsg + DeserializeOwned + 'static,
+        ExecC: MockCustomMsg + 'static,
         QueryC: CustomQuery + DeserializeOwned + 'static;
 }
 

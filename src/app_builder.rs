@@ -2,13 +2,12 @@
 
 use crate::{
     App, Bank, BankKeeper, Distribution, DistributionKeeper, FailingModule, Gov, GovFailingModule,
-    Ibc, IbcFailingModule, Module, Router, StakeKeeper, Staking, Stargate, StargateFailing, Wasm,
-    WasmKeeper,
+    Ibc, IbcFailingModule, MockCustomMsg, Module, Router, StakeKeeper, Staking, Stargate,
+    StargateFailing, Wasm, WasmKeeper,
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{Api, BlockInfo, CustomMsg, CustomQuery, Empty, Storage};
+use cosmwasm_std::{Api, BlockInfo, CustomQuery, Empty, Storage};
 use serde::de::DeserializeOwned;
-use std::fmt::Debug;
 
 /// This is essential to create a custom app with custom module.
 ///
@@ -119,8 +118,8 @@ impl<ExecC, QueryC>
         StargateFailing,
     >
 where
-    ExecC: CustomMsg + DeserializeOwned + 'static,
-    QueryC: Debug + CustomQuery + DeserializeOwned + 'static,
+    ExecC: MockCustomMsg + 'static,
+    QueryC: CustomQuery + DeserializeOwned + 'static,
 {
     /// Creates builder with default components designed to work with custom exec and query
     /// messages.

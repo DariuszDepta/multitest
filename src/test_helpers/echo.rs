@@ -3,15 +3,14 @@
 //!
 //! Additionally it bypasses all events and attributes send to it.
 
-use crate::{Contract, ContractWrapper};
+use crate::{Contract, ContractWrapper, MockCustomMsg};
 use cosmwasm_std::{
     to_json_binary, Attribute, Binary, CustomMsg, Deps, DepsMut, Empty, Env, Event, MessageInfo,
     Reply, Response, StdError, SubMsg, SubMsgResponse, SubMsgResult,
 };
 use cw_utils::{parse_execute_response_data, parse_instantiate_response_data};
 use derivative::Derivative;
-use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 // Choosing a reply id less than ECHO_EXECUTE_BASE_ID indicates an Instantiate message reply by convention.
@@ -22,7 +21,7 @@ pub const EXECUTE_REPLY_BASE_ID: u64 = i64::MAX as u64;
 #[derivative(Default(bound = "", new = "true"))]
 pub struct Message<ExecC>
 where
-    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+    ExecC: CustomMsg + 'static,
 {
     pub data: Option<String>,
     pub sub_msg: Vec<SubMsg<ExecC>>,
@@ -35,7 +34,7 @@ where
 #[derivative(Default(bound = "", new = "true"))]
 pub struct InitMessage<ExecC>
 where
-    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+    ExecC: CustomMsg + 'static,
 {
     pub data: Option<String>,
     pub sub_msg: Option<Vec<SubMsg<ExecC>>>,
@@ -49,7 +48,7 @@ fn instantiate<ExecC>(
     msg: InitMessage<ExecC>,
 ) -> Result<Response<ExecC>, StdError>
 where
-    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+    ExecC: CustomMsg + 'static,
 {
     let mut res = Response::new();
     if let Some(data) = msg.data {
@@ -69,7 +68,7 @@ fn execute<ExecC>(
     msg: Message<ExecC>,
 ) -> Result<Response<ExecC>, StdError>
 where
-    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+    ExecC: CustomMsg + 'static,
 {
     let mut resp = Response::new();
 
@@ -90,7 +89,7 @@ fn query(_deps: Deps, _env: Env, msg: Empty) -> Result<Binary, StdError> {
 #[allow(clippy::unnecessary_wraps)]
 fn reply<ExecC>(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<ExecC>, StdError>
 where
-    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+    ExecC: CustomMsg + 'static,
 {
     let res = Response::new();
     if let Reply {
@@ -130,7 +129,7 @@ pub fn contract() -> Box<dyn Contract<Empty>> {
 
 pub fn custom_contract<C>() -> Box<dyn Contract<C>>
 where
-    C: CustomMsg + DeserializeOwned + 'static,
+    C: MockCustomMsg + 'static,
 {
     let contract =
         ContractWrapper::new(execute::<C>, instantiate::<C>, query).with_reply(reply::<C>);

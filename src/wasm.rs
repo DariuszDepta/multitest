@@ -5,13 +5,14 @@ use crate::executor::AppResponse;
 use crate::prefixed_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use crate::router::{CosmosRouter, RouterQuerier};
 use crate::transactions::transactional;
+use crate::MockCustomMsg;
 use crate::{bail, AnyContext, AnyError, AnyResult, Error};
 use cosmwasm_std::testing::mock_wasmd_attr;
 use cosmwasm_std::{
     to_json_binary, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo,
-    ContractInfoResponse, CustomMsg, CustomQuery, Deps, DepsMut, Env, Event, HexBinary,
-    MessageInfo, Order, Querier, QuerierWrapper, Record, Reply, ReplyOn, Response, StdResult,
-    Storage, SubMsg, SubMsgResponse, SubMsgResult, TransactionInfo, WasmMsg, WasmQuery,
+    ContractInfoResponse, CustomQuery, Deps, DepsMut, Env, Event, HexBinary, MessageInfo, Order,
+    Querier, QuerierWrapper, Record, Reply, ReplyOn, Response, StdResult, Storage, SubMsg,
+    SubMsgResponse, SubMsgResult, TransactionInfo, WasmMsg, WasmQuery,
 };
 use cw_storage_plus::Map;
 use prost::Message;
@@ -145,7 +146,7 @@ impl<ExecC, QueryC> Default for WasmKeeper<ExecC, QueryC> {
 
 impl<ExecC, QueryC> Wasm<ExecC, QueryC> for WasmKeeper<ExecC, QueryC>
 where
-    ExecC: CustomMsg + DeserializeOwned + 'static,
+    ExecC: MockCustomMsg + 'static,
     QueryC: CustomQuery + DeserializeOwned + 'static,
 {
     fn query(
@@ -350,7 +351,7 @@ impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC> {
 
 impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC>
 where
-    ExecC: CustomMsg + DeserializeOwned + 'static,
+    ExecC: MockCustomMsg + 'static,
     QueryC: CustomQuery + DeserializeOwned + 'static,
 {
     pub fn new() -> Self {
