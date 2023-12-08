@@ -4,10 +4,11 @@ use crate::CosmosRouter;
 use crate::{anyhow, bail, AnyResult};
 use crate::{BankSudo, Module};
 use cosmwasm_std::{
-    coin, ensure, ensure_eq, to_json_binary, Addr, AllDelegationsResponse, AllValidatorsResponse,
-    Api, BankMsg, Binary, BlockInfo, BondedDenomResponse, Coin, CustomQuery, Decimal, Delegation,
-    DelegationResponse, DistributionMsg, Empty, Event, FullDelegation, Querier, StakingMsg,
-    StakingQuery, Storage, Timestamp, Uint128, Validator, ValidatorResponse,
+    coin, ensure, ensure_eq, from_json, to_json_binary, to_json_vec, Addr, AllDelegationsResponse,
+    AllValidatorsResponse, Api, BankMsg, Binary, BlockInfo, BondedDenomResponse, Coin, CosmosMsg,
+    CustomMsg, CustomQuery, Decimal, Delegation, DelegationResponse, DistributionMsg, Empty, Event,
+    FullDelegation, Querier, StakingMsg, StakingQuery, Storage, Timestamp, Uint128, Validator,
+    ValidatorResponse,
 };
 use cw_storage_plus::{Deque, Item, Map};
 use schemars::JsonSchema;
@@ -117,21 +118,21 @@ pub enum StakingSudo {
     ProcessQueue {},
 }
 
-pub trait Staking: Module<ExecT = StakingMsg, QueryT = StakingQuery, SudoT = StakingSudo> {
+pub trait Staking: Module {
     /// This is called from the end blocker (`update_block` / `set_block`) to process the
     /// staking queue.
     /// Needed because unbonding has a waiting time.
     /// If you're implementing a dummy staking module, this can be a no-op.
-    fn process_queue<ExecC, QueryC: CustomQuery>(
+    fn process_queue(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
     ) -> AnyResult<AppResponse>;
 }
 
-pub trait Distribution: Module<ExecT = DistributionMsg, QueryT = Empty, SudoT = Empty> {}
+pub trait Distribution: Module {}
 
 pub struct StakeKeeper {
     module_addr: Addr,
@@ -533,11 +534,11 @@ impl StakeKeeper {
         Ok(())
     }
 
-    fn process_queue<ExecC, QueryC: CustomQuery>(
+    fn process_queue<ExecC: CustomMsg, QueryC: CustomQuery>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
     ) -> AnyResult<AppResponse> {
         let staking_storage = prefixed_read(storage, NAMESPACE_STAKING);
@@ -579,16 +580,17 @@ impl StakeKeeper {
 
                     let staking_info = Self::get_staking_info(&staking_storage)?;
                     if !amount.is_zero() {
+                        let msg: CosmosMsg<ExecC> = BankMsg::Send {
+                            to_address: delegator.into_string(),
+                            amount: vec![coin(amount.u128(), &staking_info.bonded_denom)],
+                        }
+                        .into();
                         router.execute(
                             api,
                             storage,
                             block,
                             self.module_addr.clone(),
-                            BankMsg::Send {
-                                to_address: delegator.into_string(),
-                                amount: vec![coin(amount.u128(), &staking_info.bonded_denom)],
-                            }
-                            .into(),
+                            to_json_vec(&msg).unwrap().as_slice(),
                         )?;
                     }
                 }
@@ -602,11 +604,11 @@ impl StakeKeeper {
 }
 
 impl Staking for StakeKeeper {
-    fn process_queue<ExecC, QueryC: CustomQuery>(
+    fn process_queue(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
     ) -> AnyResult<AppResponse> {
         self.process_queue(api, storage, router, block)
@@ -614,22 +616,18 @@ impl Staking for StakeKeeper {
 }
 
 impl Module for StakeKeeper {
-    type ExecT = StakingMsg;
-    type QueryT = StakingQuery;
-    type SudoT = StakingSudo;
-
-    fn execute<ExecC, QueryC: CustomQuery>(
+    fn execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         sender: Addr,
-        msg: StakingMsg,
+        msg: &[u8],
     ) -> AnyResult<AppResponse> {
         let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
-        match msg {
-            StakingMsg::Delegate { validator, amount } => {
+        match from_json(msg) {
+            Ok(StakingMsg::Delegate { validator, amount }) => {
                 let validator = api.addr_validate(&validator)?;
 
                 // see https://github.com/cosmos/cosmos-sdk/blob/3c5387048f75d7e78b40c5b8d2421fdb8f5d973a/x/staking/types/msg.go#L202-L207
@@ -651,20 +649,20 @@ impl Module for StakeKeeper {
                     amount.clone(),
                 )?;
                 // move money from sender account to this module (note we can control sender here)
+                let msg = BankMsg::Send {
+                    to_address: self.module_addr.to_string(),
+                    amount: vec![amount],
+                };
                 router.execute(
                     api,
                     storage,
                     block,
                     sender,
-                    BankMsg::Send {
-                        to_address: self.module_addr.to_string(),
-                        amount: vec![amount],
-                    }
-                    .into(),
+                    to_json_vec(&msg).unwrap().as_slice(),
                 )?;
                 Ok(AppResponse { events, data: None })
             }
-            StakingMsg::Undelegate { validator, amount } => {
+            Ok(StakingMsg::Undelegate { validator, amount }) => {
                 let validator = api.addr_validate(&validator)?;
                 self.validate_denom(&staking_storage, &amount)?;
 
@@ -700,11 +698,11 @@ impl Module for StakeKeeper {
                 UNBONDING_QUEUE.save(&mut staking_storage, &unbonding_queue)?;
                 Ok(AppResponse { events, data: None })
             }
-            StakingMsg::Redelegate {
+            Ok(StakingMsg::Redelegate {
                 src_validator,
                 dst_validator,
                 amount,
-            } => {
+            }) => {
                 let src_validator = api.addr_validate(&src_validator)?;
                 let dst_validator = api.addr_validate(&dst_validator)?;
                 // see https://github.com/cosmos/cosmos-sdk/blob/v0.46.1/x/staking/keeper/msg_server.go#L316-L322
@@ -732,33 +730,8 @@ impl Module for StakeKeeper {
 
                 Ok(AppResponse { events, data: None })
             }
-            m => bail!("Unsupported staking message: {:?}", m),
-        }
-    }
-
-    fn sudo<ExecC, QueryC: CustomQuery>(
-        &self,
-        api: &dyn Api,
-        storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-        block: &BlockInfo,
-        msg: StakingSudo,
-    ) -> AnyResult<AppResponse> {
-        match msg {
-            StakingSudo::Slash {
-                validator,
-                percentage,
-            } => {
-                let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
-                let validator = api.addr_validate(&validator)?;
-                self.validate_percentage(percentage)?;
-
-                self.slash(api, &mut staking_storage, block, &validator, percentage)?;
-
-                Ok(AppResponse::default())
-            }
-            #[allow(deprecated)]
-            StakingSudo::ProcessQueue {} => self.process_queue(api, storage, router, block),
+            Ok(msg) => bail!("Unsupported staking message: {:?}", msg),
+            Err(_) => bail!("Some error:"),
         }
     }
 
@@ -768,14 +741,14 @@ impl Module for StakeKeeper {
         storage: &dyn Storage,
         _querier: &dyn Querier,
         block: &BlockInfo,
-        request: StakingQuery,
+        request: &[u8],
     ) -> AnyResult<Binary> {
         let staking_storage = prefixed_read(storage, NAMESPACE_STAKING);
-        match request {
-            StakingQuery::BondedDenom {} => Ok(to_json_binary(&BondedDenomResponse {
+        match from_json(request) {
+            Ok(StakingQuery::BondedDenom {}) => Ok(to_json_binary(&BondedDenomResponse {
                 denom: Self::get_staking_info(&staking_storage)?.bonded_denom,
             })?),
-            StakingQuery::AllDelegations { delegator } => {
+            Ok(StakingQuery::AllDelegations { delegator }) => {
                 let delegator = api.addr_validate(&delegator)?;
                 let validators = self.get_validators(&staking_storage)?;
 
@@ -803,10 +776,10 @@ impl Module for StakeKeeper {
                     delegations: res?,
                 })?)
             }
-            StakingQuery::Delegation {
+            Ok(StakingQuery::Delegation {
                 delegator,
                 validator,
-            } => {
+            }) => {
                 let validator_addr = Addr::unchecked(&validator);
                 let validator_obj = match self.get_validator(&staking_storage, &validator_addr)? {
                     Some(validator) => validator,
@@ -855,13 +828,42 @@ impl Module for StakeKeeper {
                 let res = to_json_binary(&full_delegation_response)?;
                 Ok(res)
             }
-            StakingQuery::AllValidators {} => Ok(to_json_binary(&AllValidatorsResponse {
+            Ok(StakingQuery::AllValidators {}) => Ok(to_json_binary(&AllValidatorsResponse {
                 validators: self.get_validators(&staking_storage)?,
             })?),
-            StakingQuery::Validator { address } => Ok(to_json_binary(&ValidatorResponse {
+            Ok(StakingQuery::Validator { address }) => Ok(to_json_binary(&ValidatorResponse {
                 validator: self.get_validator(&staking_storage, &Addr::unchecked(address))?,
             })?),
-            q => bail!("Unsupported staking sudo message: {:?}", q),
+            Ok(msg) => bail!("Unsupported staking query: {:?}", msg),
+            Err(_) => bail!("Some error:"),
+        }
+    }
+
+    fn sudo(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        router: &dyn CosmosRouter,
+        block: &BlockInfo,
+        msg: &[u8],
+    ) -> AnyResult<AppResponse> {
+        match from_json(msg) {
+            Ok(StakingSudo::Slash {
+                validator,
+                percentage,
+            }) => {
+                let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
+                let validator = api.addr_validate(&validator)?;
+                self.validate_percentage(percentage)?;
+
+                self.slash(api, &mut staking_storage, block, &validator, percentage)?;
+
+                Ok(AppResponse::default())
+            }
+            #[allow(deprecated)]
+            Ok(StakingSudo::ProcessQueue {}) => self.process_queue(api, storage, router, block),
+            Ok(msg) => bail!("Unsupported staking sudo: {:?}", msg),
+            Err(_) => bail!("Some error:"),
         }
     }
 }
@@ -927,21 +929,17 @@ impl DistributionKeeper {
 impl Distribution for DistributionKeeper {}
 
 impl Module for DistributionKeeper {
-    type ExecT = DistributionMsg;
-    type QueryT = Empty;
-    type SudoT = Empty;
-
-    fn execute<ExecC, QueryC: CustomQuery>(
+    fn execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         sender: Addr,
-        msg: DistributionMsg,
+        msg: &[u8],
     ) -> AnyResult<AppResponse> {
-        match msg {
-            DistributionMsg::WithdrawDelegatorReward { validator } => {
+        match from_json(msg) {
+            Ok(DistributionMsg::WithdrawDelegatorReward { validator }) => {
                 let validator_addr = api.addr_validate(&validator)?;
 
                 let rewards = self.remove_rewards(api, storage, block, &sender, &validator_addr)?;
@@ -974,7 +972,7 @@ impl Module for DistributionKeeper {
                     )];
                 Ok(AppResponse { events, data: None })
             }
-            DistributionMsg::SetWithdrawAddress { address } => {
+            Ok(DistributionMsg::SetWithdrawAddress { address }) => {
                 let address = api.addr_validate(&address)?;
                 // https://github.com/cosmos/cosmos-sdk/blob/4f6f6c00021f4b5ee486bbb71ae2071a8ceb47c9/x/distribution/keeper/msg_server.go#L38
                 let storage = &mut prefixed(storage, NAMESPACE_DISTRIBUTION);
@@ -986,19 +984,9 @@ impl Module for DistributionKeeper {
                         .add_attribute("withdraw_address", address)],
                 })
             }
-            m => bail!("Unsupported distribution message: {:?}", m),
+            Ok(other) => bail!("Unsupported distribution message: {:?}", other),
+            Err(_) => bail!("Some error:"),
         }
-    }
-
-    fn sudo<ExecC, QueryC>(
-        &self,
-        _api: &dyn Api,
-        _storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-        _block: &BlockInfo,
-        _msg: Empty,
-    ) -> AnyResult<AppResponse> {
-        bail!("Something went wrong - Distribution doesn't have sudo messages")
     }
 
     fn query(
@@ -1007,9 +995,20 @@ impl Module for DistributionKeeper {
         _storage: &dyn Storage,
         _querier: &dyn Querier,
         _block: &BlockInfo,
-        _request: Empty,
+        _request: &[u8],
     ) -> AnyResult<Binary> {
         bail!("Something went wrong - Distribution doesn't have query messages")
+    }
+
+    fn sudo(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter,
+        _block: &BlockInfo,
+        _msg: &[u8],
+    ) -> AnyResult<AppResponse> {
+        bail!("Something went wrong - Distribution doesn't have sudo messages")
     }
 }
 
@@ -1017,6 +1016,7 @@ impl Module for DistributionKeeper {
 mod test {
     use super::*;
     use crate::stargate::StargateFailing;
+    use crate::utils::bin;
     use crate::{
         router::MockRouter, BankKeeper, FailingModule, GovFailingModule, IbcFailingModule, Router,
         WasmKeeper,
@@ -1028,10 +1028,10 @@ mod test {
     };
 
     /// Type alias for default build `Router` to make its reference in typical scenario
-    type BasicRouter<ExecC = Empty, QueryC = Empty> = Router<
+    type BasicRouter = Router<
         BankKeeper,
-        FailingModule<ExecC, QueryC, Empty>,
-        WasmKeeper<ExecC, QueryC>,
+        FailingModule,
+        WasmKeeper,
         StakeKeeper,
         DistributionKeeper,
         IbcFailingModule,
@@ -1184,10 +1184,10 @@ mod test {
                 &mut store,
                 &router,
                 &block,
-                StakingSudo::Slash {
+                bin!(StakingSudo::Slash {
                     validator: "testvaloper1".to_string(),
                     percentage: Decimal::percent(50),
-                },
+                }),
             )
             .unwrap();
 
@@ -1209,10 +1209,10 @@ mod test {
                 &mut store,
                 &router,
                 &block,
-                StakingSudo::Slash {
+                bin!(StakingSudo::Slash {
                     validator: "testvaloper1".to_string(),
                     percentage: Decimal::percent(100),
-                },
+                }),
             )
             .unwrap();
 
@@ -1263,9 +1263,9 @@ mod test {
                 &router,
                 &block,
                 delegator.clone(),
-                DistributionMsg::WithdrawDelegatorReward {
+                bin!(DistributionMsg::WithdrawDelegatorReward {
                     validator: validator.to_string(),
-                },
+                }),
             )
             .unwrap();
 
@@ -1388,9 +1388,9 @@ mod test {
                 &router,
                 &block,
                 delegator1.clone(),
-                DistributionMsg::WithdrawDelegatorReward {
+                bin!(DistributionMsg::WithdrawDelegatorReward {
                     validator: validator.to_string(),
-                },
+                }),
             )
             .unwrap();
 
@@ -1400,10 +1400,10 @@ mod test {
                 &store,
                 &router.querier(&api, &store, &block),
                 &block,
-                BankQuery::Balance {
+                bin!(BankQuery::Balance {
                     address: delegator1.to_string(),
                     denom: "TOKEN".to_string(),
-                },
+                }),
             )
             .unwrap(),
         )
@@ -1482,7 +1482,7 @@ mod test {
                 &env.router,
                 &env.block,
                 sender,
-                msg,
+                bin!(msg),
             )
         }
 
@@ -1492,7 +1492,7 @@ mod test {
                 &env.store,
                 &env.router.querier(&env.api, &env.store, &env.block),
                 &env.block,
-                msg,
+                bin!(msg),
             )?)?)
         }
 
@@ -1507,7 +1507,7 @@ mod test {
                 &env.router,
                 &env.block,
                 sender,
-                msg,
+                bin!(msg),
             )
         }
 
@@ -1517,7 +1517,7 @@ mod test {
                 &env.store,
                 &env.router.querier(&env.api, &env.store, &env.block),
                 &env.block,
-                msg,
+                bin!(msg),
             )?)?)
         }
 
@@ -1893,10 +1893,10 @@ mod test {
                     &mut test_env.store,
                     &test_env.router,
                     &test_env.block,
-                    StakingSudo::Slash {
+                    bin!(StakingSudo::Slash {
                         validator: "nonexistingvaloper".to_string(),
                         percentage: Decimal::percent(50),
-                    },
+                    }),
                 )
                 .unwrap_err();
             assert_eq!(e.to_string(), "validator does not exist");

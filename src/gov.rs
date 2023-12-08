@@ -1,12 +1,11 @@
 use crate::{AcceptingModule, FailingModule, Module};
-use cosmwasm_std::{Empty, GovMsg};
 
-pub trait Gov: Module<ExecT = GovMsg, QueryT = Empty, SudoT = Empty> {}
+pub trait Gov: Module {}
 
-pub type GovAcceptingModule = AcceptingModule<GovMsg, Empty, Empty>;
+pub type GovAcceptingModule = AcceptingModule;
 
 impl Gov for GovAcceptingModule {}
 
-pub type GovFailingModule = FailingModule<GovMsg, Empty, Empty>;
+pub type GovFailingModule = FailingModule;
 
 impl Gov for GovFailingModule {}

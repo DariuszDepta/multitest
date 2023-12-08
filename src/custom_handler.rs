@@ -55,7 +55,7 @@ impl<Exec, Query> Module for CachingCustomHandler<Exec, Query> {
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _router: &dyn CosmosRouter,
         _block: &BlockInfo,
         _sender: Addr,
         msg: Self::ExecT,
@@ -80,7 +80,7 @@ impl<Exec, Query> Module for CachingCustomHandler<Exec, Query> {
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _router: &dyn CosmosRouter,
         _block: &BlockInfo,
         msg: Self::SudoT,
     ) -> AnyResult<AppResponse> {

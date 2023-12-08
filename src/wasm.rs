@@ -9,10 +9,10 @@ use crate::{AddressGenerator, SimpleAddressGenerator};
 use crate::{MockCustomMsg, MockCustomQuery};
 use cosmwasm_std::testing::mock_wasmd_attr;
 use cosmwasm_std::{
-    to_json_binary, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo,
-    ContractInfoResponse, Deps, DepsMut, Env, Event, HexBinary, MessageInfo, Order, Querier,
-    QuerierWrapper, Record, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgResponse,
-    SubMsgResult, TransactionInfo, WasmMsg, WasmQuery,
+    to_json_binary, to_json_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
+    ContractInfo, ContractInfoResponse, CosmosMsg, Deps, DepsMut, Env, Event, HexBinary,
+    MessageInfo, Order, Querier, QuerierWrapper, Record, Reply, ReplyOn, Response, StdResult,
+    Storage, SubMsg, SubMsgResponse, SubMsgResult, TransactionInfo, WasmMsg, WasmQuery,
 };
 use cw_storage_plus::Map;
 use prost::Message;
@@ -29,14 +29,15 @@ const NAMESPACE_WASM: &[u8] = b"wasm";
 /// See <https://github.com/chipshort/wasmd/blob/d0e3ed19f041e65f112d8e800416b3230d0005a2/x/wasm/types/events.go#L58>
 const CONTRACT_ATTR: &str = "_contract_address";
 
-#[derive(Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct WasmSudo {
     pub contract_addr: Addr,
     pub msg: Binary,
 }
 
 impl WasmSudo {
-    pub fn new<T: Serialize>(contract_addr: &Addr, msg: &T) -> StdResult<WasmSudo> {
+    /// Creates new [WasmSudo] message from provided contract address and privileged action.
+    pub fn new<T: Serialize + Deserialize>(contract_addr: &Addr, msg: &T) -> StdResult<WasmSudo> {
         Ok(WasmSudo {
             contract_addr: contract_addr.clone(),
             msg: to_json_binary(msg)?,
@@ -71,7 +72,7 @@ struct CodeData {
 }
 
 /// Interface to call into a `Wasm` module.
-pub trait Wasm<ExecC, QueryC> {
+pub trait Wasm {
     /// Handles all `WasmQuery` requests.
     fn query(
         &self,
@@ -87,7 +88,7 @@ pub trait Wasm<ExecC, QueryC> {
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
@@ -99,13 +100,13 @@ pub trait Wasm<ExecC, QueryC> {
         api: &dyn Api,
         contract_addr: Addr,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         msg: Binary,
     ) -> AnyResult<AppResponse>;
 
     /// Stores the contract's code and returns an identifier of the stored contract's code.
-    fn store_code(&mut self, creator: Addr, code: Box<dyn Contract<ExecC, QueryC>>) -> u64;
+    fn store_code(&mut self, creator: Addr, code: Box<dyn Contract>) -> u64;
 
     /// Duplicates the contract's code with specified identifier
     /// and returns an identifier of the copy of the contract's code.
@@ -118,20 +119,18 @@ pub trait Wasm<ExecC, QueryC> {
     fn dump_wasm_raw(&self, storage: &dyn Storage, address: &Addr) -> Vec<Record>;
 }
 
-pub struct WasmKeeper<ExecC, QueryC> {
+pub struct WasmKeeper {
     /// Contract codes that stand for wasm code in real-life blockchain.
-    code_base: Vec<Box<dyn Contract<ExecC, QueryC>>>,
+    code_base: Vec<Box<dyn Contract>>,
     /// Code data with code base identifier and additional attributes.
     code_data: Vec<CodeData>,
     /// Contract's address generator.
     address_generator: Box<dyn AddressGenerator>,
     /// Contract's code checksum generator.
     checksum_generator: Box<dyn ChecksumGenerator>,
-    /// Just markers to make type elision fork when using it as `Wasm` trait
-    _p: std::marker::PhantomData<QueryC>,
 }
 
-impl<ExecC, QueryC> Default for WasmKeeper<ExecC, QueryC> {
+impl Default for WasmKeeper {
     /// Returns the default value for [WasmKeeper].
     fn default() -> Self {
         Self {
@@ -139,16 +138,11 @@ impl<ExecC, QueryC> Default for WasmKeeper<ExecC, QueryC> {
             code_data: Vec::default(),
             address_generator: Box::new(SimpleAddressGenerator),
             checksum_generator: Box::new(SimpleChecksumGenerator),
-            _p: std::marker::PhantomData,
         }
     }
 }
 
-impl<ExecC, QueryC> Wasm<ExecC, QueryC> for WasmKeeper<ExecC, QueryC>
-where
-    ExecC: MockCustomMsg + 'static,
-    QueryC: MockCustomQuery + 'static,
-{
+impl Wasm for WasmKeeper {
     fn query(
         &self,
         api: &dyn Api,
@@ -192,7 +186,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
@@ -209,7 +203,7 @@ where
         api: &dyn Api,
         contract: Addr,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         msg: Binary,
     ) -> AnyResult<AppResponse> {
@@ -222,7 +216,7 @@ where
 
     /// Stores the contract's code in the in-memory lookup table.
     /// Returns an identifier of the stored contract code.
-    fn store_code(&mut self, creator: Addr, code: Box<dyn Contract<ExecC, QueryC>>) -> u64 {
+    fn store_code(&mut self, creator: Addr, code: Box<dyn Contract>) -> u64 {
         let code_base_id = self.code_base.len();
         self.code_base.push(code);
         let code_id = (self.code_data.len() + 1) as u64;
@@ -261,9 +255,9 @@ where
     }
 }
 
-impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC> {
+impl WasmKeeper {
     /// Returns a handler to code of the contract with specified code id.
-    pub fn contract_code(&self, code_id: u64) -> AnyResult<&dyn Contract<ExecC, QueryC>> {
+    pub fn contract_code(&self, code_id: u64) -> AnyResult<&dyn Contract> {
         let code_data = self.code_data(code_id)?;
         Ok(self.code_base[code_data.code_base_id].borrow())
     }
@@ -349,11 +343,7 @@ impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC> {
     }
 }
 
-impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC>
-where
-    ExecC: MockCustomMsg + 'static,
-    QueryC: MockCustomQuery + 'static,
-{
+impl WasmKeeper {
     pub fn new() -> Self {
         Self::default()
     }
@@ -417,7 +407,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         sender: T,
         recipient: String,
@@ -427,12 +417,18 @@ where
         T: Into<Addr>,
     {
         if !amount.is_empty() {
-            let msg: cosmwasm_std::CosmosMsg<ExecC> = BankMsg::Send {
+            let msg: CosmosMsg = BankMsg::Send {
                 to_address: recipient,
                 amount: amount.to_vec(),
             }
             .into();
-            let res = router.execute(api, storage, block, sender.into(), msg)?;
+            let res = router.execute(
+                api,
+                storage,
+                block,
+                sender.into(),
+                to_json_vec(&msg).unwrap().as_slice(),
+            )?;
             Ok(res)
         } else {
             Ok(AppResponse::default())
@@ -472,7 +468,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
@@ -600,7 +596,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         sender: Addr,
         admin: Option<String>,
@@ -678,7 +674,7 @@ where
     fn execute_submsg(
         &self,
         api: &dyn Api,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -690,7 +686,13 @@ where
 
         // execute in cache
         let res = transactional(storage, |write_cache, _| {
-            router.execute(api, write_cache, block, contract.clone(), msg)
+            router.execute(
+                api,
+                write_cache,
+                block,
+                contract.clone(),
+                to_json_vec(&msg).unwrap().as_slice(),
+            )
         });
 
         // call reply if meaningful
@@ -733,7 +735,7 @@ where
     fn reply(
         &self,
         api: &dyn Api,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -803,7 +805,7 @@ where
     fn process_response(
         &self,
         api: &dyn Api,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -889,7 +891,7 @@ where
         api: &dyn Api,
         storage: &mut dyn Storage,
         address: Addr,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -910,7 +912,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -930,7 +932,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         reply: Reply,
     ) -> AnyResult<Response<ExecC>> {
@@ -949,7 +951,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<ExecC>> {
@@ -968,7 +970,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<ExecC>> {
@@ -1021,7 +1023,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        router: &dyn CosmosRouter,
         block: &BlockInfo,
         address: Addr,
         action: F,
