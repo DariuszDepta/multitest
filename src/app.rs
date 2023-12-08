@@ -13,8 +13,8 @@ use crate::{FailingModule, Module};
 use crate::{Stargate, StargateFailing};
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
-    to_json_binary, to_json_vec, Addr, Api, BlockInfo, CosmosMsg, CustomMsg, CustomQuery, Empty,
-    Querier, QuerierResult, QuerierWrapper, Record, Storage,
+    to_json_binary, Addr, Api, BlockInfo, CosmosMsg, CustomMsg, CustomQuery, Empty, Querier,
+    QuerierResult, QuerierWrapper, Record, Storage,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
@@ -397,16 +397,7 @@ where
 
         transactional(&mut *storage, |write_cache, _| {
             msgs.into_iter()
-                .map(|msg| {
-                    router.execute(
-                        &*api,
-                        write_cache,
-                        block,
-                        sender.clone(),
-                        msg.clone(),
-                        to_json_vec(&msg).unwrap().as_slice(),
-                    )
-                })
+                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg))
                 .collect()
         })
     }

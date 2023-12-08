@@ -1,4 +1,4 @@
-use crate::{bail, AnyResult, AppResponse, CosmosRouter};
+use crate::{bail, AnyResult, AppResponse, CosmosRouter, MockCustomMsg, MockCustomQuery};
 use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
 
 /// Stargate interface.
@@ -12,16 +12,20 @@ pub trait Stargate {
     /// The `type_url` and `value` attributes of `CosmosMsg::Stargate`
     /// are passed directly to this handler.
     #[allow(clippy::too_many_arguments)]
-    fn execute(
+    fn execute<ExecC, QueryC>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
         type_url: String,
         value: Binary,
-    ) -> AnyResult<AppResponse> {
+    ) -> AnyResult<AppResponse>
+    where
+        ExecC: MockCustomMsg + 'static,
+        QueryC: MockCustomQuery + 'static,
+    {
         let _ = (api, storage, router, block);
         bail!(
             "Unexpected stargate message: (type_ur = {}, value = {:?}) from {:?}",
@@ -64,16 +68,20 @@ pub struct StargateAccepting;
 
 impl Stargate for StargateAccepting {
     /// Accepts all stargate messages. Returns default `AppResponse`.
-    fn execute(
+    fn execute<ExecC, QueryC>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
         type_url: String,
         value: Binary,
-    ) -> AnyResult<AppResponse> {
+    ) -> AnyResult<AppResponse>
+    where
+        ExecC: MockCustomMsg + 'static,
+        QueryC: MockCustomQuery + 'static,
+    {
         let _ = (api, storage, router, block, sender, type_url, value);
         Ok(AppResponse::default())
     }

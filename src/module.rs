@@ -1,28 +1,38 @@
-use crate::{bail, AnyResult, AppResponse, CosmosRouter};
+use crate::{bail, AnyResult, AppResponse, CosmosRouter, MockCustomMsg, MockCustomQuery};
 use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 /// Module interface.
 pub trait Module {
-    /// Processes any message, which can be called by any external actor or smart contract.
-    fn execute(
+    type ExecT;
+    type QueryT;
+    type SudoT;
+
+    /// Runs any [ExecT](Self::ExecT) message,
+    /// which can be called by any external actor or smart contract.
+    fn execute<ExecC, QueryC>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
-        msg: &[u8],
-    ) -> AnyResult<AppResponse>;
+        msg: Self::ExecT,
+    ) -> AnyResult<AppResponse>
+    where
+        ExecC: MockCustomMsg + 'static,
+        QueryC: MockCustomQuery + 'static;
 
-    /// Processes any query request, which can be called by any external actor or smart contract.
+    /// Runs any [QueryT](Self::QueryT) message,
+    /// which can be called by any external actor or smart contract.
     fn query(
         &self,
         api: &dyn Api,
         storage: &dyn Storage,
         querier: &dyn Querier,
         block: &BlockInfo,
-        request: &[u8],
+        request: Self::QueryT,
     ) -> AnyResult<Binary>;
 
     /// Runs privileged actions, like minting tokens, or governance proposals.
@@ -30,107 +40,138 @@ pub trait Module {
     /// that cannot be triggered by smart contracts.
     ///
     /// There is no sender, as this must be previously authorized before calling.
-    fn sudo(
+    fn sudo<ExecC, QueryC>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosRouter,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
-        msg: &[u8],
-    ) -> AnyResult<AppResponse>;
+        msg: Self::SudoT,
+    ) -> AnyResult<AppResponse>
+    where
+        ExecC: MockCustomMsg + 'static,
+        QueryC: MockCustomQuery + 'static;
 }
 
-#[derive(Default)]
-pub struct FailingModule;
+pub struct FailingModule<ExecT, QueryT, SudoT>(PhantomData<(ExecT, QueryT, SudoT)>);
 
-impl FailingModule {
+impl<ExecT, QueryT, SudoT> FailingModule<ExecT, QueryT, SudoT> {
     pub fn new() -> Self {
-        Default::default()
+        Self(PhantomData)
     }
 }
 
-impl Module for FailingModule {
-    /// Processes any message, always returns an error.
-    fn execute(
+impl<ExecT, QueryT, SudoT> Default for FailingModule<ExecT, QueryT, SudoT> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<ExecT, QueryT, SudoT> Module for FailingModule<ExecT, QueryT, SudoT>
+where
+    ExecT: Debug,
+    QueryT: Debug,
+    SudoT: Debug,
+{
+    type ExecT = ExecT;
+    type QueryT = QueryT;
+    type SudoT = SudoT;
+
+    /// Runs any [ExecT](Self::ExecT) message, always returns an error.
+    fn execute<ExecC, QueryC>(
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         _block: &BlockInfo,
         sender: Addr,
-        msg: &[u8],
+        msg: Self::ExecT,
     ) -> AnyResult<AppResponse> {
-        bail!("Unexpected execute message {:?} from {:?}", msg, sender)
+        bail!("Unexpected exec msg {:?} from {:?}", msg, sender)
     }
 
-    /// Processes any query request, always returns an error.
+    /// Runs any [QueryT](Self::QueryT) message, always returns an error.
     fn query(
         &self,
         _api: &dyn Api,
         _storage: &dyn Storage,
         _querier: &dyn Querier,
         _block: &BlockInfo,
-        request: &[u8],
+        request: Self::QueryT,
     ) -> AnyResult<Binary> {
-        bail!("Unexpected query request {:?}", request)
+        bail!("Unexpected custom query {:?}", request)
     }
 
-    /// Processes any privileged action, always returns an error.
-    fn sudo(
+    /// Runs any [SudoT](Self::SudoT) privileged action, always returns an error.
+    fn sudo<ExecC, QueryC>(
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         _block: &BlockInfo,
-        msg: &[u8],
+        msg: Self::SudoT,
     ) -> AnyResult<AppResponse> {
-        bail!("Unexpected sudo message {:?}", msg)
+        bail!("Unexpected sudo msg {:?}", msg)
     }
 }
 
-#[derive(Default)]
-pub struct AcceptingModule;
+pub struct AcceptingModule<ExecT, QueryT, SudoT>(PhantomData<(ExecT, QueryT, SudoT)>);
 
-impl AcceptingModule {
+impl<ExecT, QueryT, SudoT> AcceptingModule<ExecT, QueryT, SudoT> {
     pub fn new() -> Self {
-        Default::default()
+        Self(PhantomData)
     }
 }
 
-impl Module for AcceptingModule {
-    /// processes any message, always returns a default response.
-    fn execute(
+impl<ExecT, QueryT, SudoT> Default for AcceptingModule<ExecT, QueryT, SudoT> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<ExecT, QueryT, SudoT> Module for AcceptingModule<ExecT, QueryT, SudoT>
+where
+    ExecT: Debug,
+    QueryT: Debug,
+    SudoT: Debug,
+{
+    type ExecT = ExecT;
+    type QueryT = QueryT;
+    type SudoT = SudoT;
+
+    /// Runs any [ExecT](Self::ExecT) message, always returns a default response.
+    fn execute<ExecC, QueryC>(
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         _block: &BlockInfo,
         _sender: Addr,
-        _msg: &[u8],
+        _msg: Self::ExecT,
     ) -> AnyResult<AppResponse> {
         Ok(AppResponse::default())
     }
 
-    /// Processes any query request, always returns an empty binary.
+    /// Runs any [QueryT](Self::QueryT) message, always returns an empty binary.
     fn query(
         &self,
         _api: &dyn Api,
         _storage: &dyn Storage,
         _querier: &dyn Querier,
         _block: &BlockInfo,
-        _request: &[u8],
+        _request: Self::QueryT,
     ) -> AnyResult<Binary> {
         Ok(Binary::default())
     }
 
-    /// Processes any privileged action, always returns a default response.
-    fn sudo(
+    /// Runs any [SudoT](Self::SudoT) privileged action, always returns a default response.
+    fn sudo<ExecC, QueryC>(
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         _block: &BlockInfo,
-        _msg: &[u8],
+        _msg: Self::SudoT,
     ) -> AnyResult<AppResponse> {
         Ok(AppResponse::default())
     }

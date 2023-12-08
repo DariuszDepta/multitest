@@ -19,7 +19,6 @@ mod staking;
 mod stargate;
 pub mod test_helpers;
 mod transactions;
-mod utils;
 mod wasm;
 
 pub use addresses::{AddressGenerator, SimpleAddressGenerator};

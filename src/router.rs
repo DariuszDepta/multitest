@@ -1,33 +1,48 @@
-use crate::utils::bin;
 use crate::{
     bail, AnyResult, AppResponse, Bank, BankSudo, Distribution, Gov, Ibc, MockCustomMsg,
     MockCustomQuery, Module, Staking, StakingSudo, Stargate, Wasm, WasmSudo,
 };
+use core::marker::PhantomData;
 use cosmwasm_std::{
-    from_json, to_json_vec, Addr, Api, Binary, BlockInfo, ContractResult, CosmosMsg, Empty,
-    Querier, QuerierResult, QueryRequest, StdError, Storage, SystemError, SystemResult, WasmQuery,
+    from_json, Addr, Api, Binary, BlockInfo, ContractResult, CosmosMsg, CustomQuery, Empty,
+    Querier, QuerierResult, QueryRequest, Storage, SystemError, SystemResult,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
-pub struct Router {
-    pub wasm: Box<dyn Wasm>,
-    pub bank: Box<dyn Bank>,
-    pub custom: Box<dyn Module>,
-    pub staking: Box<dyn Staking>,
-    pub distribution: Box<dyn Distribution>,
-    pub ibc: Box<dyn Ibc>,
-    pub gov: Box<dyn Gov>,
-    pub stargate: Box<dyn Stargate>,
+pub struct Router<Bank, Custom, Wasm, Staking, Distr, Ibc, Gov, Stargate> {
+    // this can remain crate-only as all special functions are wired up to app currently
+    // we need to figure out another format for wasm, as some like sudo need to be called after init
+    pub(crate) wasm: Wasm,
+    // these must be pub so we can initialize them (super user) on build
+    pub bank: Bank,
+    pub custom: Custom,
+    pub staking: Staking,
+    pub distribution: Distr,
+    pub ibc: Ibc,
+    pub gov: Gov,
+    pub stargate: Stargate,
 }
 
-impl Router {
+impl<BankT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
+    Router<BankT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
+where
+    CustomT::ExecT: MockCustomMsg + 'static,
+    CustomT::QueryT: MockCustomQuery + 'static,
+    CustomT: Module,
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
+    BankT: Bank,
+    StakingT: Staking,
+    DistrT: Distribution,
+    IbcT: Ibc,
+    GovT: Gov,
+    StargateT: Stargate,
+{
     pub fn querier<'a>(
         &'a self,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
-    ) -> RouterQuerier<'a> {
+    ) -> RouterQuerier<'a, CustomT::ExecT, CustomT::QueryT> {
         RouterQuerier {
             router: self,
             api,
@@ -39,7 +54,6 @@ impl Router {
 
 /// We use it to allow calling into modules from another module in sudo mode.
 /// Things like gov proposals belong here.
-#[derive(Serialize, Deserialize)]
 pub enum SudoMsg {
     Bank(BankSudo),
     Custom(Empty),
@@ -66,74 +80,74 @@ impl From<StakingSudo> for SudoMsg {
 }
 
 pub trait CosmosRouter {
-    /// Routes messages.
+    type ExecC;
+    type QueryC: CustomQuery;
+
     fn execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
-        msg: &[u8],
+        msg: CosmosMsg<Self::ExecC>,
     ) -> AnyResult<AppResponse>;
 
-    /// Routes queries.
     fn query(
         &self,
         api: &dyn Api,
         storage: &dyn Storage,
         block: &BlockInfo,
-        request: &[u8],
+        request: QueryRequest<Self::QueryC>,
     ) -> AnyResult<Binary>;
 
-    /// Routes privileged actions.
     fn sudo(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
         block: &BlockInfo,
-        msg: &[u8],
+        msg: SudoMsg,
     ) -> AnyResult<AppResponse>;
 }
 
-impl CosmosRouter for Router {
+impl<BankT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT> CosmosRouter
+    for Router<BankT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
+where
+    CustomT::ExecT: MockCustomMsg + 'static,
+    CustomT::QueryT: MockCustomQuery + 'static,
+    CustomT: Module,
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
+    BankT: Bank,
+    StakingT: Staking,
+    DistrT: Distribution,
+    IbcT: Ibc,
+    GovT: Gov,
+    StargateT: Stargate,
+{
+    type ExecC = CustomT::ExecT;
+    type QueryC = CustomT::QueryT;
+
     fn execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
-        msg: &[u8],
+        msg: CosmosMsg<Self::ExecC>,
     ) -> AnyResult<AppResponse> {
-        match from_json(msg) {
-            Ok(CosmosMsg::Wasm(msg)) => self.wasm.execute(api, storage, self, block, sender, msg),
-            Ok(CosmosMsg::Bank(msg)) => {
-                self.bank
-                    .execute(api, storage, self, block, sender, bin!(msg))
-            }
-            Ok(CosmosMsg::Custom(msg)) => {
-                self.custom
-                    .execute(api, storage, self, block, sender, bin!(msg))
-            }
-            Ok(CosmosMsg::Staking(msg)) => {
-                self.staking
-                    .execute(api, storage, self, block, sender, bin!(msg))
-            }
-            Ok(CosmosMsg::Distribution(msg)) => {
-                self.distribution
-                    .execute(api, storage, self, block, sender, bin!(msg))
-            }
-            Ok(CosmosMsg::Ibc(msg)) => {
-                self.ibc
-                    .execute(api, storage, self, block, sender, bin!(msg))
-            }
-            Ok(CosmosMsg::Gov(msg)) => {
-                self.gov
-                    .execute(api, storage, self, block, sender, bin!(msg))
-            }
-            Ok(CosmosMsg::Stargate { type_url, value }) => self
+        match msg {
+            CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, self, block, sender, msg),
+            CosmosMsg::Bank(msg) => self.bank.execute(api, storage, self, block, sender, msg),
+            CosmosMsg::Custom(msg) => self.custom.execute(api, storage, self, block, sender, msg),
+            CosmosMsg::Staking(msg) => self.staking.execute(api, storage, self, block, sender, msg),
+            CosmosMsg::Distribution(msg) => self
+                .distribution
+                .execute(api, storage, self, block, sender, msg),
+            CosmosMsg::Ibc(msg) => self.ibc.execute(api, storage, self, block, sender, msg),
+            CosmosMsg::Gov(msg) => self.gov.execute(api, storage, self, block, sender, msg),
+            CosmosMsg::Stargate { type_url, value } => self
                 .stargate
                 .execute(api, storage, self, block, sender, type_url, value),
-            _ => unimplemented!(),
+            _ => bail!("Cannot execute {:?}", msg),
         }
     }
 
@@ -145,22 +159,16 @@ impl CosmosRouter for Router {
         api: &dyn Api,
         storage: &dyn Storage,
         block: &BlockInfo,
-        request: &[u8],
+        request: QueryRequest<Self::QueryC>,
     ) -> AnyResult<Binary> {
         let querier = self.querier(api, storage, block);
-        match from_json(request) {
-            Ok(QueryRequest::Wasm(req)) => self.wasm.query(api, storage, &querier, block, req),
-            Ok(QueryRequest::Bank(req)) => {
-                self.bank.query(api, storage, &querier, block, bin!(req))
-            }
-            Ok(QueryRequest::Custom(req)) => {
-                self.custom.query(api, storage, &querier, block, bin!(req))
-            }
-            Ok(QueryRequest::Staking(req)) => {
-                self.staking.query(api, storage, &querier, block, bin!(req))
-            }
-            Ok(QueryRequest::Ibc(req)) => self.ibc.query(api, storage, &querier, block, bin!(req)),
-            Ok(QueryRequest::Stargate { path, data }) => self
+        match request {
+            QueryRequest::Wasm(req) => self.wasm.query(api, storage, &querier, block, req),
+            QueryRequest::Bank(req) => self.bank.query(api, storage, &querier, block, req),
+            QueryRequest::Custom(req) => self.custom.query(api, storage, &querier, block, req),
+            QueryRequest::Staking(req) => self.staking.query(api, storage, &querier, block, req),
+            QueryRequest::Ibc(req) => self.ibc.query(api, storage, &querier, block, req),
+            QueryRequest::Stargate { path, data } => self
                 .stargate
                 .query(api, storage, &querier, block, path, data),
             _ => unimplemented!(),
@@ -172,42 +180,51 @@ impl CosmosRouter for Router {
         api: &dyn Api,
         storage: &mut dyn Storage,
         block: &BlockInfo,
-        msg: &[u8],
+        msg: SudoMsg,
     ) -> AnyResult<AppResponse> {
-        match from_json(msg) {
-            Ok(SudoMsg::Wasm(msg)) => {
+        match msg {
+            SudoMsg::Wasm(msg) => {
                 self.wasm
                     .sudo(api, msg.contract_addr, storage, self, block, msg.msg)
             }
-            Ok(SudoMsg::Bank(msg)) => self.bank.sudo(api, storage, self, block, bin!(msg)),
-            Ok(SudoMsg::Staking(msg)) => self.staking.sudo(api, storage, self, block, bin!(msg)),
-            Ok(SudoMsg::Custom(_)) => unimplemented!(),
+            SudoMsg::Bank(msg) => self.bank.sudo(api, storage, self, block, msg),
+            SudoMsg::Staking(msg) => self.staking.sudo(api, storage, self, block, msg),
+            SudoMsg::Custom(_) => unimplemented!(),
         }
     }
 }
 
-pub struct MockRouter;
+pub struct MockRouter<ExecC, QueryC>(PhantomData<(ExecC, QueryC)>);
 
-impl Default for MockRouter {
+impl Default for MockRouter<Empty, Empty> {
     fn default() -> Self {
-        Self
+        Self::new()
     }
 }
 
-impl MockRouter {
-    pub fn new() -> Self {
-        Self
+impl<ExecC, QueryC> MockRouter<ExecC, QueryC> {
+    pub fn new() -> Self
+    where
+        QueryC: CustomQuery,
+    {
+        MockRouter(PhantomData)
     }
 }
 
-impl CosmosRouter for MockRouter {
+impl<ExecC, QueryC> CosmosRouter for MockRouter<ExecC, QueryC>
+where
+    QueryC: CustomQuery,
+{
+    type ExecC = ExecC;
+    type QueryC = QueryC;
+
     fn execute(
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
         _block: &BlockInfo,
         _sender: Addr,
-        _msg_x: &[u8],
+        _msg: CosmosMsg<Self::ExecC>,
     ) -> AnyResult<AppResponse> {
         panic!("Cannot execute MockRouters");
     }
@@ -217,7 +234,7 @@ impl CosmosRouter for MockRouter {
         _api: &dyn Api,
         _storage: &dyn Storage,
         _block: &BlockInfo,
-        _request: &[u8],
+        _request: QueryRequest<Self::QueryC>,
     ) -> AnyResult<Binary> {
         panic!("Cannot query MockRouters");
     }
@@ -227,22 +244,22 @@ impl CosmosRouter for MockRouter {
         _api: &dyn Api,
         _storage: &mut dyn Storage,
         _block: &BlockInfo,
-        _msg: &[u8],
+        _msg: SudoMsg,
     ) -> AnyResult<AppResponse> {
         panic!("Cannot sudo MockRouters");
     }
 }
 
-pub struct RouterQuerier<'a> {
-    router: &'a dyn CosmosRouter,
+pub struct RouterQuerier<'a, ExecC, QueryC> {
+    router: &'a dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
     api: &'a dyn Api,
     storage: &'a dyn Storage,
     block_info: &'a BlockInfo,
 }
 
-impl<'a> RouterQuerier<'a> {
+impl<'a, ExecC, QueryC> RouterQuerier<'a, ExecC, QueryC> {
     pub fn new(
-        router: &'a dyn CosmosRouter,
+        router: &'a dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
@@ -256,20 +273,24 @@ impl<'a> RouterQuerier<'a> {
     }
 }
 
-impl<'a> Querier for RouterQuerier<'a> {
+impl<'a, ExecC, QueryC> Querier for RouterQuerier<'a, ExecC, QueryC>
+where
+    ExecC: MockCustomMsg + 'static,
+    QueryC: MockCustomQuery + 'static,
+{
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
-        match from_json(bin_request) {
+        let request: QueryRequest<QueryC> = match from_json(bin_request) {
+            Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
                     error: format!("Parsing query request: {}", e),
                     request: bin_request.into(),
                 })
             }
-            _ => {}
         };
         let contract_result: ContractResult<Binary> = self
             .router
-            .query(self.api, self.storage, self.block_info, bin_request)
+            .query(self.api, self.storage, self.block_info, request)
             .into();
         SystemResult::Ok(contract_result)
     }
