@@ -10,6 +10,7 @@ pub mod echo;
 pub mod error;
 pub mod gov;
 pub mod hackatom;
+pub mod ibc;
 pub mod payout;
 pub mod reflect;
 pub mod stargate;
