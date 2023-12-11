@@ -1,5 +1,6 @@
-use crate::{bail, AnyResult, AppResponse, CosmosRouter, MockCustomMsg, MockCustomQuery};
-use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
+use crate::{bail, AnyResult, AppResponse, CosmosRouter};
+use cosmwasm_std::{Addr, Api, Binary, BlockInfo, CustomMsg, CustomQuery, Querier, Storage};
+use serde::de::DeserializeOwned;
 
 /// Stargate interface.
 ///
@@ -23,8 +24,8 @@ pub trait Stargate {
         value: Binary,
     ) -> AnyResult<AppResponse>
     where
-        ExecC: MockCustomMsg + 'static,
-        QueryC: MockCustomQuery + 'static,
+        ExecC: CustomMsg + DeserializeOwned + 'static,
+        QueryC: CustomQuery + DeserializeOwned + 'static,
     {
         let _ = (api, storage, router, block);
         bail!(
@@ -79,8 +80,8 @@ impl Stargate for StargateAccepting {
         value: Binary,
     ) -> AnyResult<AppResponse>
     where
-        ExecC: MockCustomMsg + 'static,
-        QueryC: MockCustomQuery + 'static,
+        ExecC: CustomMsg + DeserializeOwned + 'static,
+        QueryC: CustomQuery + DeserializeOwned + 'static,
     {
         let _ = (api, storage, router, block, sender, type_url, value);
         Ok(AppResponse::default())

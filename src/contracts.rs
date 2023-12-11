@@ -1,6 +1,6 @@
 #![allow(clippy::type_complexity)]
 
-use crate::{anyhow, bail, AnyError, AnyResult, MockCustomQuery};
+use crate::{anyhow, bail, AnyError, AnyResult};
 use cosmwasm_std::{
     from_json, Binary, CosmosMsg, CustomMsg, CustomQuery, Deps, DepsMut, Empty, Env, MessageInfo,
     QuerierWrapper, Reply, Response, SubMsg,
@@ -82,7 +82,7 @@ pub struct ContractWrapper<
     E5: Display + Debug + Send + Sync + 'static,
     E6: Display + Debug + Send + Sync + 'static,
     C: CustomMsg,
-    Q: MockCustomQuery + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
 {
     execute_fn: ContractClosure<T1, C, E1, Q>,
     instantiate_fn: ContractClosure<T2, C, E2, Q>,
@@ -101,7 +101,7 @@ where
     E2: Display + Debug + Send + Sync + 'static,
     E3: Display + Debug + Send + Sync + 'static,
     C: CustomMsg + 'static,
-    Q: MockCustomQuery + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
 {
     pub fn new(
         execute_fn: ContractFn<T1, C, E1, Q>,
@@ -151,7 +151,7 @@ where
     E5: Display + Debug + Send + Sync + 'static,
     E6: Display + Debug + Send + Sync + 'static,
     C: CustomMsg + 'static,
-    Q: MockCustomQuery + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
 {
     pub fn with_sudo<T4A, E4A>(
         self,
@@ -266,7 +266,7 @@ where
     T: DeserializeOwned + 'static,
     E: Display + Debug + Send + Sync + 'static,
     C: CustomMsg + 'static,
-    Q: MockCustomQuery + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
 {
     let customized = move |mut deps: DepsMut<Q>,
                            env: Env,
@@ -283,7 +283,7 @@ fn customize_query<T, E, Q>(raw_fn: QueryFn<T, E, Empty>) -> QueryClosure<T, E, 
 where
     T: DeserializeOwned + 'static,
     E: Display + Debug + Send + Sync + 'static,
-    Q: MockCustomQuery + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
 {
     let customized = move |deps: Deps<Q>, env: Env, msg: T| -> Result<Binary, E> {
         let deps = decustomize_deps(&deps);
@@ -294,7 +294,7 @@ where
 
 fn decustomize_deps_mut<'a, Q>(deps: &'a mut DepsMut<Q>) -> DepsMut<'a, Empty>
 where
-    Q: MockCustomQuery + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
 {
     DepsMut {
         storage: deps.storage,
@@ -305,7 +305,7 @@ where
 
 fn decustomize_deps<'a, Q>(deps: &'a Deps<'a, Q>) -> Deps<'a, Empty>
 where
-    Q: MockCustomQuery + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
 {
     Deps {
         storage: deps.storage,
@@ -321,7 +321,7 @@ where
     T: DeserializeOwned + 'static,
     E: Display + Debug + Send + Sync + 'static,
     C: CustomMsg + 'static,
-    Q: MockCustomQuery + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
 {
     let customized = move |deps: DepsMut<Q>, env: Env, msg: T| -> Result<Response<C>, E> {
         raw_fn(deps, env, msg).map(customize_response::<C>)
@@ -377,7 +377,7 @@ where
     E5: Display + Debug + Send + Sync + 'static,
     E6: Display + Debug + Send + Sync + 'static,
     C: CustomMsg,
-    Q: MockCustomQuery,
+    Q: CustomQuery + DeserializeOwned,
 {
     fn execute(
         &self,

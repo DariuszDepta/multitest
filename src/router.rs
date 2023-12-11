@@ -1,12 +1,13 @@
 use crate::{
-    bail, AnyResult, AppResponse, Bank, BankSudo, Distribution, Gov, Ibc, MockCustomMsg,
-    MockCustomQuery, Module, Staking, StakingSudo, Stargate, Wasm, WasmSudo,
+    bail, AnyResult, AppResponse, Bank, BankSudo, Distribution, Gov, Ibc, Module, Staking,
+    StakingSudo, Stargate, Wasm, WasmSudo,
 };
 use core::marker::PhantomData;
 use cosmwasm_std::{
-    from_json, Addr, Api, Binary, BlockInfo, ContractResult, CosmosMsg, CustomQuery, Empty,
-    Querier, QuerierResult, QueryRequest, Storage, SystemError, SystemResult,
+    from_json, Addr, Api, Binary, BlockInfo, ContractResult, CosmosMsg, CustomMsg, CustomQuery,
+    Empty, Querier, QuerierResult, QueryRequest, Storage, SystemError, SystemResult,
 };
+use serde::de::DeserializeOwned;
 
 #[derive(Clone)]
 pub struct Router<Bank, Custom, Wasm, Staking, Distr, Ibc, Gov, Stargate> {
@@ -26,8 +27,8 @@ pub struct Router<Bank, Custom, Wasm, Staking, Distr, Ibc, Gov, Stargate> {
 impl<BankT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
     Router<BankT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
 where
-    CustomT::ExecT: MockCustomMsg + 'static,
-    CustomT::QueryT: MockCustomQuery + 'static,
+    CustomT::ExecT: CustomMsg + DeserializeOwned + 'static,
+    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
     CustomT: Module,
     WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
@@ -112,8 +113,8 @@ pub trait CosmosRouter {
 impl<BankT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT> CosmosRouter
     for Router<BankT, CustomT, WasmT, StakingT, DistrT, IbcT, GovT, StargateT>
 where
-    CustomT::ExecT: MockCustomMsg + 'static,
-    CustomT::QueryT: MockCustomQuery + 'static,
+    CustomT::ExecT: CustomMsg + DeserializeOwned + 'static,
+    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
     CustomT: Module,
     WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
@@ -275,8 +276,8 @@ impl<'a, ExecC, QueryC> RouterQuerier<'a, ExecC, QueryC> {
 
 impl<'a, ExecC, QueryC> Querier for RouterQuerier<'a, ExecC, QueryC>
 where
-    ExecC: MockCustomMsg + 'static,
-    QueryC: MockCustomQuery + 'static,
+    ExecC: CustomMsg + DeserializeOwned + 'static,
+    QueryC: CustomQuery + DeserializeOwned + 'static,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         let request: QueryRequest<QueryC> = match from_json(bin_request) {
