@@ -1,11 +1,31 @@
+//! # Error definitions used across this library
+
 use cosmwasm_std::{WasmMsg, WasmQuery};
 use thiserror::Error;
 
+/// An enumeration of error variants used across this library.
+///
+/// To create a specific error variant, please use any of the associated functions.
+///
+/// # Example
+///
+/// ```
+/// use multitest::Error;
+///
+/// let err = Error::empty_attribute_key("MultiTest");
+///
+/// // use the error instance
+///
+/// assert_eq!("Empty attribute key. Value: MultiTest", err.to_string());
+///
+/// ```
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
+    /// [Error](Self) variant used for signalling an empty attribute key.
     #[error("Empty attribute key. Value: {0}")]
     EmptyAttributeKey(String),
 
+    /// [Error](Self) variant used for signalling an empty attribute value.
     #[error("Empty attribute value. Key: {0}")]
     EmptyAttributeValue(String),
 
@@ -32,6 +52,17 @@ pub enum Error {
 }
 
 impl Error {
+    /// Creates an [Error](Self) instance for empty attribute key.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use multitest::Error;
+    ///
+    /// let err = Error::empty_attribute_key("December");
+    /// assert_eq!("Empty attribute key. Value: December", err.to_string());
+    ///
+    /// ```
     pub fn empty_attribute_key(value: impl Into<String>) -> Self {
         Self::EmptyAttributeKey(value.into())
     }
