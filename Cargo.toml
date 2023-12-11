@@ -1,8 +1,8 @@
 [package]
 name = "multitest"
 version = "0.0.1"
-authors = ["Dariusz Depta <141360751+DariuszDepta@users.noreply.github.com>"]
-description = "Experimental testing tool"
+authors = ["Dariusz Depta <DariuszDepta@users.noreply.github.com>"]
+description = "Do not use yet - work in progress"
 repository = "https://github.com/DariuszDepta/multitest.git"
 license = "Apache-2.0"
 edition = "2021"
