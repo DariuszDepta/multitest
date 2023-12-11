@@ -18,12 +18,12 @@ pub mod stargate;
 /// Custom message for testing purposes.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename = "snake_case")]
-pub enum ReflectMsg {
+pub enum TestCustomMsg {
     SetName { name: String },
     SetAge { age: u32 },
 }
 
-impl CustomMsg for ReflectMsg {}
+impl CustomMsg for TestCustomMsg {}
 
 /// Persisted counter for testing purposes.
 pub const COUNT: Item<u32> = Item::new("count");

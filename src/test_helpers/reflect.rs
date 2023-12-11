@@ -1,4 +1,4 @@
-use crate::test_helpers::{payout, ReflectMsg, COUNT};
+use crate::test_helpers::{payout, TestCustomMsg, COUNT};
 use crate::{Contract, ContractWrapper};
 use cosmwasm_std::{
     to_json_binary, Binary, Deps, DepsMut, Empty, Env, Event, MessageInfo, Reply, Response,
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Message {
-    pub messages: Vec<SubMsg<ReflectMsg>>,
+    pub messages: Vec<SubMsg<TestCustomMsg>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,7 +25,7 @@ fn instantiate(
     _env: Env,
     _info: MessageInfo,
     _msg: Empty,
-) -> Result<Response<ReflectMsg>, StdError> {
+) -> Result<Response<TestCustomMsg>, StdError> {
     COUNT.save(deps.storage, &0)?;
     Ok(Response::default())
 }
@@ -35,7 +35,7 @@ fn execute(
     _env: Env,
     _info: MessageInfo,
     msg: Message,
-) -> Result<Response<ReflectMsg>, StdError> {
+) -> Result<Response<TestCustomMsg>, StdError> {
     COUNT.update::<_, StdError>(deps.storage, |old| Ok(old + 1))?;
 
     Ok(Response::new().add_submessages(msg.messages))
@@ -55,7 +55,7 @@ fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, StdError> {
     }
 }
 
-fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<ReflectMsg>, StdError> {
+fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<TestCustomMsg>, StdError> {
     REFLECT.save(deps.storage, msg.id, &msg)?;
     // add custom event here to test
     let event = Event::new("custom")
@@ -64,7 +64,7 @@ fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<ReflectMsg>, S
     Ok(Response::new().add_event(event))
 }
 
-pub fn contract() -> Box<dyn Contract<ReflectMsg>> {
+pub fn contract() -> Box<dyn Contract<TestCustomMsg>> {
     let contract = ContractWrapper::new(execute, instantiate, query).with_reply(reply);
     Box::new(contract)
 }
