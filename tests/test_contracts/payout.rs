@@ -1,4 +1,4 @@
-use crate::test_contract_helpers::payout;
+use crate::test_contract_helpers::contract_payout;
 use crate::test_contract_helpers::payout::PayoutInit;
 use cosmwasm_std::{coin, coins, Addr, Coin, Empty, Event};
 use multitest::{App, Executor};
@@ -27,7 +27,7 @@ fn payout_operations_should_work() {
     let creator = chain.api().addr_make("creator");
 
     // store the contract on a chain
-    let code_id = chain.store_code(creator, payout::contract());
+    let code_id = chain.store_code(creator, contract_payout());
 
     // prepare the initial amount to payed
     let payout_init = PayoutInit {

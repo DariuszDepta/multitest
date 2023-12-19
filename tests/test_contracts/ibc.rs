@@ -1,4 +1,4 @@
-use crate::test_contract_helpers::ibc;
+use crate::test_contract_helpers::contract_ibc;
 use cosmwasm_std::{Addr, Empty, StdResult};
 use multitest::{App, Executor};
 
@@ -26,7 +26,7 @@ fn storing_contract_should_work() {
     let creator = creator(&chain);
 
     // store the contract on a chain - no code of the contract is called
-    let code_id = chain.store_code(creator, ibc::contract());
+    let code_id = chain.store_code(creator, contract_ibc());
 
     // because there are no previously stored contracts then code id should be 1
     assert_eq!(1, code_id);
@@ -41,7 +41,7 @@ fn instantiating_contract_should_work() {
     let creator = creator(&chain);
 
     // store the contract on a chain - no code of the contract is called
-    let code_id = chain.store_code(creator, ibc::contract());
+    let code_id = chain.store_code(creator, contract_ibc());
 
     // instantiate the contract
     let sender = owner(&chain);
@@ -62,7 +62,7 @@ fn executing_contract_should_work() {
     let creator = creator(&chain);
 
     // store the contract on a chain - no code of the contract is called
-    let code_id = chain.store_code(creator, ibc::contract());
+    let code_id = chain.store_code(creator, contract_ibc());
 
     // instantiate the contract
     let sender = owner(&chain);
@@ -86,7 +86,7 @@ fn querying_contract_should_work() {
     let creator = creator(&chain);
 
     // store the contract on a chain - no code of the contract is called
-    let code_id = chain.store_code(creator, ibc::contract());
+    let code_id = chain.store_code(creator, contract_ibc());
 
     // instantiate the contract
     let sender = owner(&chain);

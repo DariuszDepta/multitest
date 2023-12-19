@@ -3,7 +3,6 @@ use cosmwasm_std::{
     StdResult,
 };
 use cw_storage_plus::Item;
-use multitest::{Contract, ContractWrapper};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -34,13 +33,13 @@ const COUNT: Item<u32> = Item::new("count");
 /// Payout amount.
 const PAYOUT: Item<PayoutInit> = Item::new("payout");
 
-fn instantiate(deps: DepsMut, _: Env, _: MessageInfo, msg: PayoutInit) -> StdResult<Response> {
+pub fn instantiate(deps: DepsMut, _: Env, _: MessageInfo, msg: PayoutInit) -> StdResult<Response> {
     PAYOUT.save(deps.storage, &msg)?;
     COUNT.save(deps.storage, &0)?;
     Ok(Response::default())
 }
 
-fn execute(deps: DepsMut, _: Env, info: MessageInfo, _: Empty) -> StdResult<Response> {
+pub fn execute(deps: DepsMut, _: Env, info: MessageInfo, _: Empty) -> StdResult<Response> {
     // always try to payout what was set originally
     let payout = PAYOUT.load(deps.storage)?;
     let msg = BankMsg::Send {
@@ -52,7 +51,7 @@ fn execute(deps: DepsMut, _: Env, info: MessageInfo, _: Empty) -> StdResult<Resp
         .add_attribute("action", "payout"))
 }
 
-fn query(deps: Deps, _: Env, msg: PayoutQuery) -> StdResult<Binary> {
+pub fn query(deps: Deps, _: Env, msg: PayoutQuery) -> StdResult<Binary> {
     match msg {
         PayoutQuery::Count {} => {
             let count = COUNT.load(deps.storage)?;
@@ -66,11 +65,7 @@ fn query(deps: Deps, _: Env, msg: PayoutQuery) -> StdResult<Binary> {
     }
 }
 
-fn sudo(deps: DepsMut, _: Env, msg: PayoutSudo) -> StdResult<Response> {
+pub fn sudo(deps: DepsMut, _: Env, msg: PayoutSudo) -> StdResult<Response> {
     COUNT.save(deps.storage, &msg.set_count)?;
     Ok(Response::default())
-}
-
-pub fn contract() -> Box<dyn Contract> {
-    Box::new(ContractWrapper::new_with_empty(execute, instantiate, query).with_sudo_empty(sudo))
 }
