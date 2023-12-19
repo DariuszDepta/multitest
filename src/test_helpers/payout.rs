@@ -1,8 +1,8 @@
 use crate::test_helpers::COUNT;
 use crate::{Contract, ContractWrapper};
 use cosmwasm_std::{
-    to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Response,
-    StdError,
+    to_json_binary, BankMsg, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    Response, StdError,
 };
 use cw_storage_plus::Item;
 use serde::{Deserialize, Serialize};
@@ -73,7 +73,10 @@ fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, StdError> {
     }
 }
 
-pub fn contract() -> Box<dyn Contract> {
+pub fn contract<C>() -> Box<dyn Contract<C>>
+where
+    C: CustomMsg + 'static,
+{
     let contract =
         ContractWrapper::new_with_empty(execute, instantiate, query).with_sudo_empty(sudo);
     Box::new(contract)

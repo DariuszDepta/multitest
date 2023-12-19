@@ -84,6 +84,6 @@ impl<Exec, Query> Module for CachingCustomHandler<Exec, Query> {
         _block: &BlockInfo,
         msg: Self::SudoT,
     ) -> AnyResult<AppResponse> {
-        bail!("Unexpected sudo msg {:?}", msg)
+        bail!("Unexpected custom sudo message {:?}", msg)
     }
 }

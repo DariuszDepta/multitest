@@ -29,7 +29,7 @@ pub enum Error {
     #[error("Empty attribute value. Key: {0}")]
     EmptyAttributeValue(String),
 
-    #[error("Attribute key starts with reserved prefix: {0}")]
+    #[error("Attribute key starts with reserved prefix _: {0}")]
     ReservedAttributeKey(String),
 
     #[error("Event type too short: {0}")]

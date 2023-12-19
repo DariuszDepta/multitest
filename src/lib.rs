@@ -18,6 +18,7 @@ mod router;
 mod staking;
 mod stargate;
 pub mod test_helpers;
+mod tests;
 mod transactions;
 mod wasm;
 

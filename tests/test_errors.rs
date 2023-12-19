@@ -12,7 +12,7 @@ fn creating_errors_should_work() {
         Error::empty_attribute_value("beta").to_string()
     );
     assert_eq!(
-        "Attribute key starts with reserved prefix: bowl",
+        "Attribute key starts with reserved prefix _: bowl",
         Error::reserved_attribute_key("bowl").to_string()
     );
     assert_eq!(
