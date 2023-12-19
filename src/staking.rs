@@ -899,10 +899,9 @@ impl DistributionKeeper {
     }
 
     pub fn get_withdraw_address(storage: &dyn Storage, delegator: &Addr) -> AnyResult<Addr> {
-        Ok(match WITHDRAW_ADDRESS.may_load(storage, delegator)? {
-            Some(a) => a,
-            None => delegator.clone(),
-        })
+        Ok(WITHDRAW_ADDRESS
+            .may_load(storage, delegator)?
+            .unwrap_or_else(|| delegator.clone()))
     }
 
     // https://docs.cosmos.network/main/modules/distribution#msgsetwithdrawaddress

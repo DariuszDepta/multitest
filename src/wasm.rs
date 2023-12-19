@@ -1079,9 +1079,9 @@ where
 #[derive(Clone, PartialEq, Message)]
 struct InstantiateResponse {
     #[prost(string, tag = "1")]
-    pub address: ::prost::alloc::string::String,
+    pub address: String,
     #[prost(bytes, tag = "2")]
-    pub data: ::prost::alloc::vec::Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 // TODO: encode helpers in utils
@@ -1100,7 +1100,7 @@ fn instantiate_response(data: Option<Binary>, contact_address: &Addr) -> Binary 
 #[derive(Clone, PartialEq, Message)]
 struct ExecuteResponse {
     #[prost(bytes, tag = "1")]
-    pub data: ::prost::alloc::vec::Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 // empty return if no data present in original
