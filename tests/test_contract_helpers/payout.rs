@@ -33,13 +33,20 @@ const COUNT: Item<u32> = Item::new("count");
 /// Payout amount.
 const PAYOUT: Item<PayoutInit> = Item::new("payout");
 
-pub fn instantiate(deps: DepsMut, _: Env, _: MessageInfo, msg: PayoutInit) -> StdResult<Response> {
+pub fn instantiate(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: PayoutInit,
+) -> StdResult<Response> {
+    let _ = (env, info);
     PAYOUT.save(deps.storage, &msg)?;
     COUNT.save(deps.storage, &0)?;
     Ok(Response::default())
 }
 
-pub fn execute(deps: DepsMut, _: Env, info: MessageInfo, _: Empty) -> StdResult<Response> {
+pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: Empty) -> StdResult<Response> {
+    let _ = (env, msg);
     // always try to payout what was set originally
     let payout = PAYOUT.load(deps.storage)?;
     let msg = BankMsg::Send {
@@ -51,7 +58,8 @@ pub fn execute(deps: DepsMut, _: Env, info: MessageInfo, _: Empty) -> StdResult<
         .add_attribute("action", "payout"))
 }
 
-pub fn query(deps: Deps, _: Env, msg: PayoutQuery) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: PayoutQuery) -> StdResult<Binary> {
+    let _ = env;
     match msg {
         PayoutQuery::Count {} => {
             let count = COUNT.load(deps.storage)?;
@@ -65,7 +73,8 @@ pub fn query(deps: Deps, _: Env, msg: PayoutQuery) -> StdResult<Binary> {
     }
 }
 
-pub fn sudo(deps: DepsMut, _: Env, msg: PayoutSudo) -> StdResult<Response> {
+pub fn sudo(deps: DepsMut, env: Env, msg: PayoutSudo) -> StdResult<Response> {
+    let _ = env;
     COUNT.save(deps.storage, &msg.set_count)?;
     Ok(Response::default())
 }

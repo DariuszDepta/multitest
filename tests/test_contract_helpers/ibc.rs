@@ -3,16 +3,13 @@ use cosmwasm_std::{
     StdResult,
 };
 
-pub fn instantiate(
-    _deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    _msg: Empty,
-) -> StdResult<Response> {
+pub fn instantiate(deps: DepsMut, env: Env, info: MessageInfo, msg: Empty) -> StdResult<Response> {
+    let _ = (deps, env, info, msg);
     Ok(Response::new())
 }
 
-pub fn execute(_deps: DepsMut, _env: Env, _info: MessageInfo, _msg: Empty) -> StdResult<Response> {
+pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: Empty) -> StdResult<Response> {
+    let _ = (deps, env, info, msg);
     let msg: CosmosMsg = IbcMsg::CloseChannel {
         channel_id: "channel".to_string(),
     }
@@ -20,6 +17,7 @@ pub fn execute(_deps: DepsMut, _env: Env, _info: MessageInfo, _msg: Empty) -> St
     Ok(Response::new().add_message(msg))
 }
 
-pub fn query(_deps: Deps, _env: Env, _msg: Empty) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: Empty) -> StdResult<Binary> {
+    let _ = (deps, env, msg);
     Err(StdError::generic_err("Query failed"))
 }
