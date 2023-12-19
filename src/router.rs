@@ -81,7 +81,7 @@ impl From<StakingSudo> for SudoMsg {
 }
 
 pub trait CosmosRouter {
-    type ExecC;
+    type ExecC: CustomMsg;
     type QueryC: CustomQuery;
 
     fn execute(
@@ -214,6 +214,7 @@ impl<ExecC, QueryC> MockRouter<ExecC, QueryC> {
 
 impl<ExecC, QueryC> CosmosRouter for MockRouter<ExecC, QueryC>
 where
+    ExecC: CustomMsg,
     QueryC: CustomQuery,
 {
     type ExecC = ExecC;

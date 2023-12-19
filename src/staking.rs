@@ -5,9 +5,9 @@ use crate::{anyhow, bail, AnyResult};
 use crate::{BankSudo, Module};
 use cosmwasm_std::{
     coin, ensure, ensure_eq, to_json_binary, Addr, AllDelegationsResponse, AllValidatorsResponse,
-    Api, BankMsg, Binary, BlockInfo, BondedDenomResponse, Coin, CustomQuery, Decimal, Delegation,
-    DelegationResponse, DistributionMsg, Empty, Event, FullDelegation, Querier, StakingMsg,
-    StakingQuery, Storage, Timestamp, Uint128, Validator, ValidatorResponse,
+    Api, BankMsg, Binary, BlockInfo, BondedDenomResponse, Coin, CustomMsg, CustomQuery, Decimal,
+    Delegation, DelegationResponse, DistributionMsg, Empty, Event, FullDelegation, Querier,
+    StakingMsg, StakingQuery, Storage, Timestamp, Uint128, Validator, ValidatorResponse,
 };
 use cw_storage_plus::{Deque, Item, Map};
 use schemars::JsonSchema;
@@ -122,7 +122,7 @@ pub trait Staking: Module<ExecT = StakingMsg, QueryT = StakingQuery, SudoT = Sta
     /// staking queue.
     /// Needed because unbonding has a waiting time.
     /// If you're implementing a dummy staking module, this can be a no-op.
-    fn process_queue<ExecC, QueryC: CustomQuery>(
+    fn process_queue<ExecC: CustomMsg, QueryC: CustomQuery>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
@@ -533,7 +533,7 @@ impl StakeKeeper {
         Ok(())
     }
 
-    fn process_queue<ExecC, QueryC: CustomQuery>(
+    fn process_queue<ExecC: CustomMsg, QueryC: CustomQuery>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
@@ -602,7 +602,7 @@ impl StakeKeeper {
 }
 
 impl Staking for StakeKeeper {
-    fn process_queue<ExecC, QueryC: CustomQuery>(
+    fn process_queue<ExecC: CustomMsg, QueryC: CustomQuery>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
@@ -618,7 +618,7 @@ impl Module for StakeKeeper {
     type QueryT = StakingQuery;
     type SudoT = StakingSudo;
 
-    fn execute<ExecC, QueryC: CustomQuery>(
+    fn execute<ExecC: CustomMsg, QueryC: CustomQuery>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
@@ -736,32 +736,6 @@ impl Module for StakeKeeper {
         }
     }
 
-    fn sudo<ExecC, QueryC: CustomQuery>(
-        &self,
-        api: &dyn Api,
-        storage: &mut dyn Storage,
-        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-        block: &BlockInfo,
-        msg: StakingSudo,
-    ) -> AnyResult<AppResponse> {
-        match msg {
-            StakingSudo::Slash {
-                validator,
-                percentage,
-            } => {
-                let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
-                let validator = api.addr_validate(&validator)?;
-                self.validate_percentage(percentage)?;
-
-                self.slash(api, &mut staking_storage, block, &validator, percentage)?;
-
-                Ok(AppResponse::default())
-            }
-            #[allow(deprecated)]
-            StakingSudo::ProcessQueue {} => self.process_queue(api, storage, router, block),
-        }
-    }
-
     fn query(
         &self,
         api: &dyn Api,
@@ -864,6 +838,32 @@ impl Module for StakeKeeper {
             q => bail!("Unsupported staking sudo message: {:?}", q),
         }
     }
+
+    fn sudo<ExecC: CustomMsg, QueryC: CustomQuery>(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        block: &BlockInfo,
+        msg: StakingSudo,
+    ) -> AnyResult<AppResponse> {
+        match msg {
+            StakingSudo::Slash {
+                validator,
+                percentage,
+            } => {
+                let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
+                let validator = api.addr_validate(&validator)?;
+                self.validate_percentage(percentage)?;
+
+                self.slash(api, &mut staking_storage, block, &validator, percentage)?;
+
+                Ok(AppResponse::default())
+            }
+            #[allow(deprecated)]
+            StakingSudo::ProcessQueue {} => self.process_queue(api, storage, router, block),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -931,7 +931,7 @@ impl Module for DistributionKeeper {
     type QueryT = Empty;
     type SudoT = Empty;
 
-    fn execute<ExecC, QueryC: CustomQuery>(
+    fn execute<ExecC: CustomMsg, QueryC: CustomQuery>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
@@ -990,17 +990,6 @@ impl Module for DistributionKeeper {
         }
     }
 
-    fn sudo<ExecC, QueryC>(
-        &self,
-        _api: &dyn Api,
-        _storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-        _block: &BlockInfo,
-        _msg: Empty,
-    ) -> AnyResult<AppResponse> {
-        bail!("Something went wrong - Distribution doesn't have sudo messages")
-    }
-
     fn query(
         &self,
         _api: &dyn Api,
@@ -1010,6 +999,17 @@ impl Module for DistributionKeeper {
         _request: Empty,
     ) -> AnyResult<Binary> {
         bail!("Something went wrong - Distribution doesn't have query messages")
+    }
+
+    fn sudo<ExecC, QueryC>(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _block: &BlockInfo,
+        _msg: Empty,
+    ) -> AnyResult<AppResponse> {
+        bail!("Something went wrong - Distribution doesn't have sudo messages")
     }
 }
 
