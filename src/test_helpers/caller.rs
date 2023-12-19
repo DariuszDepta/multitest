@@ -19,7 +19,6 @@ fn execute(
     msg: WasmMsg,
 ) -> Result<Response, StdError> {
     let message = SubMsg::new(msg);
-
     Ok(Response::new().add_submessage(message))
 }
 
