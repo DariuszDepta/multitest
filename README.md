@@ -1,5 +1,3 @@
-> Experimental multi-purpose testing tool
-
 # Multitest
 
 [![multitest on crates.io][crates-badge]][crates-url]
@@ -20,4 +18,7 @@
 
 [apache-badge]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 
+Experimental multi-purpose testing tool.
+
 **🚧 work in progress 🚧**
+
